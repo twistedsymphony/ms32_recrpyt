@@ -14,41 +14,49 @@ keys = {
   'SS91022-10': { #SS91022-10: desertwr, gametngk, gratiaa, tp2m32
     'tx':{ #gfx4
       'addr_xor': 0x00000,
-      'data_xor': 0x35
+      'data_xor': 0x35,
+      'header_byte': 0x05
     },
     'bg':{ #gfx3
       'addr_xor': 0x00000,
-      'data_xor': 0xa3
+      'data_xor': 0xa3,
+      'header_byte': 0x16
     }
   },
-  'SS92046-01': { #SS92046_01: bbbxing, bnstars, f1superb, hayaosi2, hayaosi3, hayaosi3a, tetrisp, wpksocv2
+  'SS92046-01': { #SS92046-01: bbbxing, bnstars, f1superb, hayaosi2, hayaosi3, hayaosi3a, tetrisp, wpksocv2
     'tx':{ #gfx4
       'addr_xor': 0x00020,
-      'data_xor': 0x7e
+      'data_xor': 0x7e,
+      'header_byte': 0x49
     },
     'bg':{ #gfx3
       'addr_xor': 0x00001,
-      'data_xor': 0x9b
+      'data_xor': 0x9b,
+      'header_byte': 0x3E
     }
   },
   'SS92047-01': { #SS92047-01: akiss, gratia, kirarast
     'tx':{ #gfx4
       'addr_xor': 0x24000,
-      'data_xor': 0x18
+      'data_xor': 0x18,
+      'header_byte': 0xD2
     },
     'bg':{ #gfx3
       'addr_xor': 0x24000,
-      'data_xor': 0x55
+      'data_xor': 0x55,
+      'header_byte': 0x27
     }
   },
   'SS92048-01': { #SS92048-01: p47aces, p47acesa, suchie2, suchie2o
     'tx':{ #gfx4
       'addr_xor': 0x20400,
-      'data_xor': 0xd6
+      'data_xor': 0xd6,
+      'header_byte': 0x38
     },
     'bg':{ #gfx3
       'addr_xor': 0x20400,
-      'data_xor': 0xd4
+      'data_xor': 0xd4,
+      'header_byte': 0x03
     }
   }
 }
@@ -61,6 +69,7 @@ def decrypt_ms32_tx(enc_data, addr_xor, data_xor):
   addr_xor ^= 0x1005d
 
   for i in range(data_size):
+    #determine the scrambled address j from the unscrambled address i
     j = 0
     i ^= addr_xor
 
@@ -87,7 +96,7 @@ def decrypt_ms32_tx(enc_data, addr_xor, data_xor):
 
     i ^= addr_xor
 
-    # simple XOR for the data
+    # decrypt the data at the address
     dec_data[i] = enc_data[j] ^ (i & 0xff) ^ data_xor
     
   return dec_data
@@ -95,12 +104,14 @@ def decrypt_ms32_tx(enc_data, addr_xor, data_xor):
 
 
 #encrypt tx ROM
-def encrypt_ms32_tx(dec_data, addr_xor, data_xor):
+def encrypt_ms32_tx(dec_data, addr_xor, data_xor, header_byte):
   data_size = len(dec_data)
   enc_data = bytearray(data_size)
   addr_xor ^= 0x1005d
+  tx_header_length = 0x40
 
   for i in range(data_size):
+    #determine the scrambled address j from the unscrambled address i
     j = 0
     i ^= addr_xor
     
@@ -127,7 +138,11 @@ def encrypt_ms32_tx(dec_data, addr_xor, data_xor):
     
     i ^= addr_xor
     
-    enc_data[j] = dec_data[i] ^ (i & 0xff) ^ data_xor
+    #encrypt the data at the address
+    data_byte = dec_data[i]
+    if i < tx_header_length: #if this is a header byte
+      data_byte = header_byte #set the new header byte value
+    enc_data[j] = data_byte ^ (i & 0xff) ^ data_xor
     
   return enc_data
 
@@ -140,6 +155,7 @@ def decrypt_ms32_bg(enc_data, addr_xor, data_xor):
   addr_xor ^= 0xc1c5b
 
   for i in range(data_size):
+    #determine the scrambled address j from the unscrambled address i
     j = (i & ~0xfffff)  # top bits are not affected
     i ^= addr_xor
 
@@ -167,7 +183,7 @@ def decrypt_ms32_bg(enc_data, addr_xor, data_xor):
 
     i ^= addr_xor
 
-    # simple XOR for the data
+    #decrypt the data at the address
     dec_data[i] = enc_data[j] ^ (i & 0xff) ^ data_xor
 
   return dec_data
@@ -175,12 +191,14 @@ def decrypt_ms32_bg(enc_data, addr_xor, data_xor):
 
 
 #encrypt bg ROM
-def encrypt_ms32_bg(dec_data, addr_xor, data_xor):
+def encrypt_ms32_bg(dec_data, addr_xor, data_xor, header_byte):
   data_size = len(dec_data)
   enc_data = bytearray(data_size)
   addr_xor ^= 0xc1c5b
-
+  bg_header_length = 0x100
+  
   for i in range(data_size):
+    #determine the scrambled address j from the unscrambled address i
     j = (i & ~0xfffff)  # top bits are not affected
     i ^= addr_xor
 
@@ -208,8 +226,11 @@ def encrypt_ms32_bg(dec_data, addr_xor, data_xor):
     
     i ^= addr_xor
 
-    # simple XOR for the data
-    enc_data[j] = dec_data[i] ^ (i & 0xff) ^ data_xor
+    #encrypt the data at the address
+    data_byte = dec_data[i]
+    if i < bg_header_length: #if this is a header byte
+      data_byte = header_byte #set the new header byte value
+    enc_data[j] = data_byte ^ (i & 0xff) ^ data_xor
 
   return enc_data
 
@@ -245,17 +266,19 @@ else: # decrypt
 if args.ic_out == '': #skip encrypt
   out_data = dec_data
   print('No Encryption')
-else: # decrypt
+else: # encrypt
   enc_addr_xor = keys[args.ic_out][args.gfx]['addr_xor']
   print('Encryption ADDR_XOR: '+hex(enc_addr_xor))
   enc_data_xor = keys[args.ic_out][args.gfx]['data_xor']
   print('Encryption DATA_XOR: '+hex(enc_data_xor))
+  header_byte = keys[args.ic_out][args.gfx]['header_byte']
+  print('Encryption HEADER_BYTE: '+hex(header_byte))
   if args.gfx == 'bg':
     print('Encrypting BG GFX')
-    out_data = encrypt_ms32_bg(dec_data, enc_addr_xor, enc_data_xor)
+    out_data = encrypt_ms32_bg(dec_data, enc_addr_xor, enc_data_xor, header_byte)
   elif args.gfx == 'tx':
     print('Encrypting TX GFX')
-    out_data = encrypt_ms32_tx(dec_data, enc_addr_xor, enc_data_xor)
+    out_data = encrypt_ms32_tx(dec_data, enc_addr_xor, enc_data_xor, header_byte)
 
 with open(args.output_file, 'wb') as f:
   f.write(bytes(out_data))
