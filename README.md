@@ -1,4 +1,4 @@
-# ms32_recrpyt
+# ms32_recrypt
 Allows decrypting and re-encryping of Jaleco MegaSystem 32 game data
 
 The Jaleco Mega System 32 arcade hardware uses a cascading XOR encryption and address scrambling algorithm on the Background and Text data. This is facilitated on the cartridge through a custom protection chip. There are 4 known protection chips used across all games on the system.
